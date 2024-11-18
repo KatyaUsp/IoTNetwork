@@ -33,7 +33,7 @@ def main():
     for index, row in df.iterrows():
         data = row.to_dict()
         producer.send('iot_topic', value=data)
-        time.sleep(0.1)  # Adjust the sleep time as needed
+        time.sleep(1)  # Adjust the sleep time as needed
 
     producer.flush()
     producer.close()

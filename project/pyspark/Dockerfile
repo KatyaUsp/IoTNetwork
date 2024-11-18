@@ -1,6 +1,4 @@
-# pyspark/Dockerfile
-
-FROM bitnami/spark:latest
+FROM bitnami/spark:3.4.0
 
 # Install necessary tools
 USER root
@@ -20,5 +18,5 @@ ENV PYSPARK_PYTHON=python3
 # Set the default command with required packages and repositories
 CMD ["spark-submit", \
      "--repositories", "https://artifacts.elastic.co/maven", \
-     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.0,org.elasticsearch:elasticsearch-spark-30_2.12:8.2.0", \
+     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0,org.elasticsearch:elasticsearch-spark-30_2.12:8.9.0", \
      "/app/pyspark_streaming.py"]
