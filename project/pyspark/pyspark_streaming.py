@@ -49,24 +49,23 @@ def main():
     # For example, filter anomalies
     #anomalies = df_parsed.filter(col("Label") != "Benign")
 
-    #Write the stream to console (for testing)
-    # query = df_parsed.writeStream \
+    # Write the stream to console (for testing)
+    # query = anomalies.writeStream \
     #     .outputMode("append") \
-    #     .format("console") \
+    #     .format("es") \
+    #     .option("checkpointLocation", "/tmp/checkpoints") \
+    #     .option("es.resource", "iot_index/_doc") \
+    #     .option("es.nodes", "elasticsearch") \
+    #     .option("es.port", "9200") \
     #     .start()
 
-    #Alternatively, write to Elasticsearch for real-time analytics
-# ... previous code ...
-
-    query = df_parsed.writeStream \
+    # Alternatively, write to Elasticsearch for real-time analytics
+    query = anomalies.writeStream \
         .outputMode("append") \
         .format("es") \
         .option("checkpointLocation", "/tmp/checkpoints") \
-        .option("es.resource", "iot_index_4") \
+        .option("es.resource", "iot_index/_doc") \
         .start()
-
-# ... rest of the code ...
-
 
 
     query.awaitTermination()

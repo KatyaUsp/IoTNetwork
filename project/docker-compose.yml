@@ -57,38 +57,37 @@ services:
     volumes:
       - esdata:/usr/share/elasticsearch/data
 
-  grafana:
-    image: 'grafana/grafana:latest'
-    container_name: grafana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.9.2
     ports:
-      - '3000:3000'
-    volumes:
-      - grafana-storage:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - elasticsearch
+      - "5601:5601"
+
+  # grafana:
+  #   image: 'grafana/grafana:latest'
+  #   container_name: grafana
+  #   ports:
+  #     - '3000:3000'
+  #   volumes:
+  #     - grafana-storage:/var/lib/grafana
+  #     - ./grafana/provisioning:/etc/grafana/provisioning
+  #   depends_on:
+  #     - elasticsearch
     
-  model:
-    build:
-      context: ./model
-    container_name: model
-    depends_on:
-      - elasticsearch
-    volumes:
-      - ./model:/app
+  # model:
+  #   build:
+  #     context: ./model
+  #   container_name: modelx0
+  #   depends_on:
+  #     - elasticsearch
+  #   volumes:
+  #     - ./model:/app
 
   kafka_manager:
-
     image: hlebalbau/kafka-manager:stable
-
     ports:
-
       - "9000:9000"
-
     environment:
-
       ZK_HOSTS: "zookeeper:2181"
-
       APPLICATION_SECRET: "random-secret"
  
 
