@@ -1,1 +1,2 @@
-project/data
+#ignore the csv files
+*.csv
