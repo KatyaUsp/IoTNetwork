@@ -11,6 +11,7 @@ def main():
         .config("spark.es.nodes.wan.only", "true") \
         .config("spark.es.net.ssl.cert.allow.self.signed", "true") \
         .config("spark.es.net.ssl", "false") \
+        .config("spark.es.net.ssl.verification", "false") \
         .getOrCreate()
 
     spark.sparkContext.setLogLevel("WARN")
@@ -52,13 +53,18 @@ def main():
     checkpoint_dir = "/tmp/spark_checkpoint"  # You can choose any directory here
 
     # Write the parsed data to Elasticsearch with checkpointing
+    # query = df_with_timestamp.writeStream \
+    #     .outputMode("append") \
+    #     .format("org.elasticsearch.spark.sql") \
+    #     .option("es.resource", "iot_index") \
+    #     .option("checkpointLocation", checkpoint_dir) \
+    #     .start()
+
+    #Write the stream to console (for testing)
     query = df_with_timestamp.writeStream \
         .outputMode("append") \
-        .format("org.elasticsearch.spark.sql") \
-        .option("es.resource", "iot_index") \
-        .option("checkpointLocation", checkpoint_dir) \
+        .format("console") \
         .start()
-
     query.awaitTermination()
 
 if __name__ == "__main__":

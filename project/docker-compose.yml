@@ -47,15 +47,28 @@ services:
     volumes:
       - ./pyspark:/app
 
-  elasticsearch:
-    image: 'elasticsearch:7.9.2'
-    container_name: elasticsearch
-    environment:
-      - discovery.type=single-node
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
     ports:
-      - '9200:9200'
+      - "8086:8086"
+    environment:
+      - INFLUXDB_DB=iot_data  # Database for storing data
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=admin123
+      - INFLUXDB_HTTP_AUTH_ENABLED=true
     volumes:
-      - esdata:/usr/share/elasticsearch/data
+      - influxdb-data:/var/lib/influxdb
+    
+
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    depends_on:
+      - kafka
+      - influxdb
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
 
   grafana:
     image: 'grafana/grafana:latest'
@@ -66,34 +79,27 @@ services:
       - grafana-storage:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
-      - elasticsearch
-    
+      - influxdb
+
   model:
     build:
       context: ./model
     container_name: model
     depends_on:
-      - elasticsearch
+      - influxdb
     volumes:
       - ./model:/app
 
   kafka_manager:
-
     image: hlebalbau/kafka-manager:stable
-
     ports:
-
       - "9000:9000"
-
     environment:
-
       ZK_HOSTS: "zookeeper:2181"
-
       APPLICATION_SECRET: "random-secret"
- 
 
 volumes:
-  esdata:
+  influxdb-data:
     driver: local
   grafana-storage:
     driver: local
