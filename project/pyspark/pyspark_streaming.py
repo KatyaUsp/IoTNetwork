@@ -24,6 +24,7 @@ def main():
         StructField("Dst_IP", StringType(), True),
         StructField("Dst_Port", IntegerType(), True),
         StructField("Protocol", StringType(), True),
+        StructField("Flow_Pkts/s", IntegerType(), True),
         # Add all other fields accordingly
         StructField("Label", StringType(), True),
         StructField("Cat", StringType(), True),
@@ -38,16 +39,10 @@ def main():
         .option("subscribe", "iot_topic") \
         .load()
 
-    # Define the timestamp format
-    timestamp_format = "dd/MM/yyyy hh:mm:ss a"
-
     # Parse the "value" column as JSON and extract the fields using the schema
     df_parsed = df.selectExpr("CAST(value AS STRING)") \
         .select(from_json(col("value"), schema).alias("data")) \
         .select("data.*")
-
-    # Convert the "Timestamp" field from String to TimestampType
-    df_with_timestamp = df_parsed.withColumn("Timestamp", to_timestamp("Timestamp", timestamp_format))
 
     # Set a checkpoint location for the Elasticsearch commit log
     checkpoint_dir = "/tmp/spark_checkpoint"  # You can choose any directory here
@@ -61,7 +56,7 @@ def main():
     #     .start()
 
     #Write the stream to console (for testing)
-    query = df_with_timestamp.writeStream \
+    query = df_parsed.writeStream \
         .outputMode("append") \
         .format("console") \
         .start()

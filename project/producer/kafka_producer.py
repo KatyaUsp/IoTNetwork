@@ -28,6 +28,12 @@ def main():
 
     # Read the dataset
     df = pd.read_csv('/data/iot_network_intrusion_dataset.csv')
+    df = df.sort_values('Timestamp')
+    
+
+    #simulate 3 different input source
+    ip_list = ['192.168.0.16','192.168.0.24','192.168.0.13']
+
 
     # Stream data to Kafka topic
     for index, row in df.iterrows():

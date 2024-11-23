@@ -47,48 +47,48 @@ services:
     volumes:
       - ./pyspark:/app
 
-  influxdb:
-    image: influxdb:latest
-    container_name: influxdb
-    ports:
-      - "8086:8086"
-    environment:
-      - INFLUXDB_DB=iot_data  # Database for storing data
-      - INFLUXDB_ADMIN_USER=admin
-      - INFLUXDB_ADMIN_PASSWORD=admin123
-      - INFLUXDB_HTTP_AUTH_ENABLED=true
-    volumes:
-      - influxdb-data:/var/lib/influxdb
+  # influxdb:
+  #   image: influxdb:latest
+  #   container_name: influxdb
+  #   ports:
+  #     - "8086:8086"
+  #   environment:
+  #     - INFLUXDB_DB=iot_data  # Database for storing data
+  #     - INFLUXDB_ADMIN_USER=admin
+  #     - INFLUXDB_ADMIN_PASSWORD=admin123
+  #     - INFLUXDB_HTTP_AUTH_ENABLED=true
+  #   volumes:
+  #     - influxdb-data:/var/lib/influxdb
     
 
-  telegraf:
-    image: telegraf:latest
-    container_name: telegraf
-    depends_on:
-      - kafka
-      - influxdb
-    volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+  # telegraf:
+  #   image: telegraf:latest
+  #   container_name: telegraf
+  #   depends_on:
+  #     - kafka
+  #     - influxdb
+  #   volumes:
+  #     - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
 
-  grafana:
-    image: 'grafana/grafana:latest'
-    container_name: grafana
-    ports:
-      - '3000:3000'
-    volumes:
-      - grafana-storage:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - influxdb
+  # grafana:
+  #   image: 'grafana/grafana:latest'
+  #   container_name: grafana
+  #   ports:
+  #     - '3000:3000'
+  #   volumes:
+  #     - grafana-storage:/var/lib/grafana
+  #     - ./grafana/provisioning:/etc/grafana/provisioning
+  #   depends_on:
+  #     - influxdb
 
-  model:
-    build:
-      context: ./model
-    container_name: model
-    depends_on:
-      - influxdb
-    volumes:
-      - ./model:/app
+  # model:
+  #   build:
+  #     context: ./model
+  #   container_name: model
+  #   depends_on:
+  #     - influxdb
+  #   volumes:
+  #     - ./model:/app
 
   kafka_manager:
     image: hlebalbau/kafka-manager:stable
