@@ -1,7 +1,5 @@
 # docker-compose.yml
 
-version: '3.8'
-
 services:
   zookeeper:
     image: 'bitnami/zookeeper:latest'
@@ -10,6 +8,11 @@ services:
       - '2181:2181'
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181", "|", "grep", "imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
     image: 'bitnami/kafka:latest'
@@ -17,12 +20,18 @@ services:
     ports:
       - '9092:9092'
     environment:
-      - KAFKA_BROKER_ID=1
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_BROKER_ID=1
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - ALLOW_PLAINTEXT_LISTENER=yes
     depends_on:
       - zookeeper
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   producer:
     build:
@@ -53,16 +62,23 @@ services:
     ports:
       - "8086:8086"
     environment:
-      - INFLUXDB_DB=iot_data  # Database for storing data
-      - INFLUXDB_ADMIN_USER=admin
-      - INFLUXDB_ADMIN_PASSWORD=admin123
-      - INFLUXDB_HTTP_AUTH_ENABLED=true
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=admin123
+      - DOCKER_INFLUXDB_INIT_ORG=your_org
+      - DOCKER_INFLUXDB_INIT_BUCKET=iot_data
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=qenhpUMJyt_fIzacORn4M_0yTUDQqNJByLxwEJPVn0gZlyhcYphnn4zV59gY6og7oT3ASLynkcAjlJOmoE-zMQ==
     volumes:
       - influxdb-data:/var/lib/influxdb
-    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   telegraf:
-    image: telegraf:latest
+    build:
+      context: ./telegraf
     container_name: telegraf
     depends_on:
       - kafka
@@ -92,6 +108,7 @@ services:
 
   kafka_manager:
     image: hlebalbau/kafka-manager:stable
+    container_name: kafka_manager
     ports:
       - "9000:9000"
     environment:
