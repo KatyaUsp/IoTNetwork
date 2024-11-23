@@ -1,22 +1,42 @@
+from prometheus_client import start_http_server, Counter, Gauge
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_timestamp
-from pyspark.sql.types import *
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType  # Import necessary types
+import threading
 
-def main():
-    # Initialize the Spark session
+import threading
+# Initialize Spark Session
+def initialize_spark():
     spark = SparkSession.builder \
         .appName("IoTDataProcessing") \
-        .config("spark.es.nodes", "elasticsearch") \
-        .config("spark.es.port", "9200") \
-        .config("spark.es.nodes.wan.only", "true") \
-        .config("spark.es.net.ssl.cert.allow.self.signed", "true") \
-        .config("spark.es.net.ssl", "false") \
-        .config("spark.es.net.ssl.verification", "false") \
+        .config("spark.sql.shuffle.partitions", "4") \
         .getOrCreate()
+    return spark
 
-    spark.sparkContext.setLogLevel("WARN")
+# Example metric definitions
+processed_records = Counter('processed_records', 'Number of records processed')
+processing_latency = Gauge('processing_latency', 'Latency in processing records')
+
+# Function to record metrics
+def record_metrics(record_count, latency):
+    processed_records.inc(record_count)
+    processing_latency.set(latency)
+
+# Start Prometheus server on port 8000
+def start_prometheus_server():
+    threading.Thread(target=start_http_server, args=(8000,), daemon=True).start()
+
+def main():
+    # Initialize Spark session
+    spark = initialize_spark()
+
+    # Read data from Kafka
+    df = spark.readStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", "kafka:9092") \
+        .option("subscribe", "iot_topic") \
+        .load()
     
-    # Define the schema based on your dataset fields
     schema = StructType([
         StructField("Flow_ID", StringType(), True),
         StructField("Src_IP", StringType(), True),
@@ -28,56 +48,32 @@ def main():
         StructField("Label", StringType(), True),
         StructField("Cat", StringType(), True),
         StructField("Sub_Cat", StringType(), True),
-        StructField("Timestamp", StringType(), True)  
+        StructField("Timestamp", StringType(), True)  # Timestamp is initially a string
     ])
 
-    # Read data from Kafka
-    df = spark.readStream \
-        .format("kafka") \
-        .option("kafka.bootstrap.servers", "kafka:9092") \
-        .option("subscribe", "iot_topic") \
-        .load()
+    # Define the timestamp format
+    timestamp_format = "dd/MM/yyyy hh:mm:ss a"
 
-   
+    # Parse the "value" column as JSON and extract the fields using the schema
+    df_parsed = df.selectExpr("CAST(value AS STRING)") \
     # Parse the "value" column as JSON and extract the fields using the schema
     df_parsed = df.selectExpr("CAST(value AS STRING)") \
         .select(from_json(col("value"), schema).alias("data")) \
         .select("data.*")
-    
-    device_ips = ['192.168.0.13', '192.168.0.24', '192.168.0.16'] 
 
-    # Filter the DataFrame by IP and create separate streams for each device
-    df_device_1 = df_parsed.filter(col("Src_IP") == device_ips[0])
-    df_device_2 = df_parsed.filter(col("Src_IP") == device_ips[1])
-    df_device_3 = df_parsed.filter(col("Src_IP") == device_ips[2])
+    # Convert the "Timestamp" field from String to TimestampType
+    df_with_timestamp = df_parsed.withColumn("Timestamp", to_timestamp("Timestamp", timestamp_format))
 
-    # Set checkpoint directory for each stream (you can use different directories if needed)
-    checkpoint_dir = "/tmp/spark_checkpoint"  # You can choose any directory here
+    # Start Prometheus metrics server
+    start_prometheus_server()
 
-    # Write the streams to different outputs (e.g., console or Elasticsearch) for each device
-    query_device_1 = df_device_1.writeStream \
+    query = df_with_timestamp.writeStream \
         .outputMode("append") \
         .format("console") \
-        .option("checkpointLocation", checkpoint_dir + "/device_1") \
+        .foreachBatch(lambda df, epoch_id: record_metrics(df.count(), 0.5)) \
         .start()
 
-    query_device_2 = df_device_2.writeStream \
-        .outputMode("append") \
-        .format("console") \
-        .option("checkpointLocation", checkpoint_dir + "/device_2") \
-        .start()
-
-    query_device_3 = df_device_3.writeStream \
-        .outputMode("append") \
-        .format("console") \
-        .option("checkpointLocation", checkpoint_dir + "/device_3") \
-        .start()
-
-    # Await termination of the streams
-    query_device_1.awaitTermination()
-    query_device_2.awaitTermination()
-    query_device_3.awaitTermination()
+    query.awaitTermination()
 
 if __name__ == "__main__":
     main()
-   
