@@ -46,7 +46,13 @@ ENV PYSPARK_PYTHON=python3
 RUN pip install prometheus-client
 
 # Set the default command with Kafka and Prometheus Sink dependencies
+#CMD ["spark-submit", \
+#     "--conf", "spark.driver.extraJavaOptions=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-1.0.1.jar=8000:/opt/bitnami/spark/jars/spark-jmx-exporter.yml", \
+#     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0", \
+#     "/app/pyspark_streaming.py"]
+
 CMD ["spark-submit", \
-     "--conf", "spark.driver.extraJavaOptions=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-1.0.1.jar=8000:/opt/bitnami/spark/jars/spark-jmx-exporter.yml", \
+     "--conf", "spark.driver.extraJavaOptions=-javaagent:/opt/bitnami/spark/jars/jmx_prometheus_javaagent-1.0.1.jar=8000:/opt/bitnami/spark/jars/spark-jmx-exporter.yml -Dcom.sun.management.jmxremote.host=0.0.0.0", \
      "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0", \
      "/app/pyspark_streaming.py"]
+     
