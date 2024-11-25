@@ -40,7 +40,7 @@ def main():
     # Define the known IP addresses for each device
     device_ips = ['192.168.0.13', '192.168.0.24', '192.168.0.16'] 
     # Read the dataset
-    df = pd.read_csv('/data/iot_network_intrusion_dataset1.csv')
+    df = pd.read_csv('/data/iot_network_intrusion_dataset.csv')
     
     # Create Kafka Producers for each device
     producer_device_1 = create_producer()
