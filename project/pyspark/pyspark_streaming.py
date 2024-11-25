@@ -1,17 +1,19 @@
-# pyspark/pyspark_streaming.py
-
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_timestamp
 from pyspark.sql.types import *
 
 def main():
-    # Initialize Spark Session
+    # Initialize the Spark session
     spark = SparkSession.builder \
         .appName("IoTDataProcessing") \
         .config("spark.es.nodes", "elasticsearch") \
         .config("spark.es.port", "9200") \
+        .config("spark.es.nodes.wan.only", "true") \
+        .config("spark.es.net.ssl.cert.allow.self.signed", "true") \
+        .config("spark.es.net.ssl", "false") \
+        .config("spark.es.net.ssl.verification", "false") \
         .getOrCreate()
-    
+
     spark.sparkContext.setLogLevel("WARN")
     
     # Define the schema based on your dataset fields
@@ -26,7 +28,7 @@ def main():
         StructField("Label", StringType(), True),
         StructField("Cat", StringType(), True),
         StructField("Sub_Cat", StringType(), True),
-        StructField("Timestamp", TimestampType(), True)
+        StructField("Timestamp", StringType(), True)  # Timestamp is initially a string
     ])
 
     # Read data from Kafka
@@ -39,40 +41,31 @@ def main():
     # Define the timestamp format
     timestamp_format = "dd/MM/yyyy hh:mm:ss a"
 
-    df_with_timestamp = df.withColumn("Timestamp", to_timestamp("Timestamp", timestamp_format))
-
-    df_parsed = df_with_timestamp.selectExpr("CAST(value AS STRING)") \
+    # Parse the "value" column as JSON and extract the fields using the schema
+    df_parsed = df.selectExpr("CAST(value AS STRING)") \
         .select(from_json(col("value"), schema).alias("data")) \
         .select("data.*")
-    
-    # Perform transformations if needed
-    # For example, filter anomalies
-    #anomalies = df_parsed.filter(col("Label") != "Benign")
 
-    #Write the stream to console (for testing)
-    # query = df_parsed.writeStream \
+    # Convert the "Timestamp" field from String to TimestampType
+    df_with_timestamp = df_parsed.withColumn("Timestamp", to_timestamp("Timestamp", timestamp_format))
+
+    # Set a checkpoint location for the Elasticsearch commit log
+    checkpoint_dir = "/tmp/spark_checkpoint"  # You can choose any directory here
+
+    # Write the parsed data to Elasticsearch with checkpointing
+    # query = df_with_timestamp.writeStream \
     #     .outputMode("append") \
-    #     .format("console") \
+    #     .format("org.elasticsearch.spark.sql") \
+    #     .option("es.resource", "iot_index") \
+    #     .option("checkpointLocation", checkpoint_dir) \
     #     .start()
 
-    #Alternatively, write to Elasticsearch for real-time analytics
-# ... previous code ...
-
-    query = df_parsed.writeStream \
+    #Write the stream to console (for testing)
+    query = df_with_timestamp.writeStream \
         .outputMode("append") \
-        .format("es") \
-        .option("checkpointLocation", "/tmp/checkpoints") \
-        .option("es.resource", "iot_index_4") \
+        .format("console") \
         .start()
-
-# ... rest of the code ...
-
-
-
     query.awaitTermination()
 
 if __name__ == "__main__":
     main()
-
-
-

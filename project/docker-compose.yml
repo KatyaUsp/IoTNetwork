@@ -1,7 +1,5 @@
 # docker-compose.yml
 
-version: '3.8'
-
 services:
   zookeeper:
     image: 'bitnami/zookeeper:latest'
@@ -10,6 +8,11 @@ services:
       - '2181:2181'
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181", "|", "grep", "imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
     image: 'bitnami/kafka:latest'
@@ -17,12 +20,18 @@ services:
     ports:
       - '9092:9092'
     environment:
-      - KAFKA_BROKER_ID=1
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_BROKER_ID=1
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - ALLOW_PLAINTEXT_LISTENER=yes
     depends_on:
       - zookeeper
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   producer:
     build:
@@ -47,15 +56,35 @@ services:
     volumes:
       - ./pyspark:/app
 
-  elasticsearch:
-    image: 'elasticsearch:7.9.2'
-    container_name: elasticsearch
-    environment:
-      - discovery.type=single-node
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
     ports:
-      - '9200:9200'
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=admin123
+      - DOCKER_INFLUXDB_INIT_ORG=your_org
+      - DOCKER_INFLUXDB_INIT_BUCKET=iot_data
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=qenhpUMJyt_fIzacORn4M_0yTUDQqNJByLxwEJPVn0gZlyhcYphnn4zV59gY6og7oT3ASLynkcAjlJOmoE-zMQ==
     volumes:
-      - esdata:/usr/share/elasticsearch/data
+      - influxdb-data:/var/lib/influxdb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  telegraf:
+    build:
+      context: ./telegraf
+    container_name: telegraf
+    depends_on:
+      - kafka
+      - influxdb
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
 
   grafana:
     image: 'grafana/grafana:latest'
@@ -66,34 +95,28 @@ services:
       - grafana-storage:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
-      - elasticsearch
-    
+      - influxdb
+
   model:
     build:
       context: ./model
     container_name: model
     depends_on:
-      - elasticsearch
+      - influxdb
     volumes:
       - ./model:/app
 
   kafka_manager:
-
     image: hlebalbau/kafka-manager:stable
-
+    container_name: kafka_manager
     ports:
-
       - "9000:9000"
-
     environment:
-
       ZK_HOSTS: "zookeeper:2181"
-
       APPLICATION_SECRET: "random-secret"
- 
 
 volumes:
-  esdata:
+  influxdb-data:
     driver: local
   grafana-storage:
     driver: local
