@@ -1,12 +1,12 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_timestamp
 from pyspark.sql.types import *
+from pyspark.sql.streaming import DataStreamWriter
 
 def main():
     # Initialize the Spark session
     spark = SparkSession.builder \
         .appName("IoTDataProcessing") \
-        .config("spark.es.nodes", "elasticsearch") \
         .config("spark.es.port", "9200") \
         .config("spark.es.nodes.wan.only", "true") \
         .config("spark.es.net.ssl.cert.allow.self.signed", "true") \
@@ -24,11 +24,10 @@ def main():
         StructField("Dst_IP", StringType(), True),
         StructField("Dst_Port", IntegerType(), True),
         StructField("Protocol", StringType(), True),
-        # Add all other fields accordingly
         StructField("Label", StringType(), True),
         StructField("Cat", StringType(), True),
         StructField("Sub_Cat", StringType(), True),
-        StructField("Timestamp", StringType(), True)  # Timestamp is initially a string
+        StructField("Timestamp", StringType(), True) 
     ])
 
     # Read data from Kafka
@@ -38,34 +37,47 @@ def main():
         .option("subscribe", "iot_topic") \
         .load()
 
-    # Define the timestamp format
-    timestamp_format = "dd/MM/yyyy hh:mm:ss a"
 
     # Parse the "value" column as JSON and extract the fields using the schema
     df_parsed = df.selectExpr("CAST(value AS STRING)") \
         .select(from_json(col("value"), schema).alias("data")) \
         .select("data.*")
 
-    # Convert the "Timestamp" field from String to TimestampType
-    df_with_timestamp = df_parsed.withColumn("Timestamp", to_timestamp("Timestamp", timestamp_format))
 
-    # Set a checkpoint location for the Elasticsearch commit log
+    # Define device IPs (known IPs for each device)
+    device_ips = ['192.168.0.13', '192.168.0.24', '192.168.0.16'] 
+
+    # Filter the DataFrame by IP and create separate streams for each device
+    df_device_1 = df_parsed.filter(col("Src_IP") == device_ips[0])
+    df_device_2 = df_parsed.filter(col("Src_IP") == device_ips[1])
+    df_device_3 = df_parsed.filter(col("Src_IP") == device_ips[2])
+
+    # Set checkpoint directory for each stream (you can use different directories if needed)
     checkpoint_dir = "/tmp/spark_checkpoint"  # You can choose any directory here
 
-    # Write the parsed data to Elasticsearch with checkpointing
-    # query = df_with_timestamp.writeStream \
-    #     .outputMode("append") \
-    #     .format("org.elasticsearch.spark.sql") \
-    #     .option("es.resource", "iot_index") \
-    #     .option("checkpointLocation", checkpoint_dir) \
-    #     .start()
-
-    #Write the stream to console (for testing)
-    query = df_with_timestamp.writeStream \
+    # Write the streams to different outputs (e.g., console or Elasticsearch) for each device
+    query_device_1 = df_device_1.writeStream \
         .outputMode("append") \
         .format("console") \
+        .option("checkpointLocation", checkpoint_dir + "/device_1") \
         .start()
-    query.awaitTermination()
+
+    query_device_2 = df_device_2.writeStream \
+        .outputMode("append") \
+        .format("console") \
+        .option("checkpointLocation", checkpoint_dir + "/device_2") \
+        .start()
+
+    query_device_3 = df_device_3.writeStream \
+        .outputMode("append") \
+        .format("console") \
+        .option("checkpointLocation", checkpoint_dir + "/device_3") \
+        .start()
+
+    # Await termination of the streams
+    query_device_1.awaitTermination()
+    query_device_2.awaitTermination()
+    query_device_3.awaitTermination()
 
 if __name__ == "__main__":
     main()
