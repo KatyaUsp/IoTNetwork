@@ -24,7 +24,7 @@ def main():
         StructField("Dst_IP", StringType(), True),
         StructField("Dst_Port", IntegerType(), True),
         StructField("Protocol", StringType(), True),
-        StructField("Flow_Pkts/s", IntegerType(), True),
+        StructField("Flow_Pkts/s", FloatType(), True),
         # Add all other fields accordingly
         StructField("Label", StringType(), True),
         StructField("Cat", StringType(), True),
