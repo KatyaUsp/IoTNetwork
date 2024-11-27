@@ -1,18 +1,46 @@
+from prometheus_client import start_http_server, Counter, Gauge
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_timestamp
 from pyspark.sql.types import *
 from pyspark.sql.streaming import DataStreamWriter
+import threading
 
-def main():
-    # Initialize the Spark session
+# Initialize Spark Session
+def initialize_spark():
     spark = SparkSession.builder \
         .appName("IoTDataProcessing") \
-        .config("spark.es.port", "9200") \
-        .config("spark.es.nodes.wan.only", "true") \
-        .config("spark.es.net.ssl.cert.allow.self.signed", "true") \
-        .config("spark.es.net.ssl", "false") \
-        .config("spark.es.net.ssl.verification", "false") \
+        .config("spark.sql.shuffle.partitions", "4") \
+        .config("spark.executor.instances", "4") \
         .getOrCreate()
+    return spark
+
+# Define Prometheus metrics
+src_ip_counter = Counter('src_ip_count', 'Number of occurrences of each source IP', ['src_ip'])
+flow_id_counter = Counter('flow_id_count', 'Number of processed Flow IDs', ['flow_id'])
+processed_records = Counter('processed_records_total', 'Total number of records processed')
+processing_latency = Gauge('processing_latency', 'Latency in processing records')
+
+# Start Prometheus metrics server
+def start_prometheus_server():
+    threading.Thread(target=start_http_server, args=(7000,), daemon=True).start()
+    print("Prometheus server started on port 8000")
+
+# Function to process and record metrics
+def record_metrics(batch_df, epoch_id):
+    record_count = batch_df.count()
+    processed_records.inc(record_count)  # Increment total processed records
+    processing_latency.set(0.5)  # Example latency value (replace with actual if available)
+    
+    # Iterate over the batch to extract and update metrics
+    for row in batch_df.collect():  # Be cautious with `collect` for large datasets
+        if row["Src_IP"]:
+            src_ip_counter.labels(src_ip=row["Src_IP"]).inc(1)
+        if row["Flow_ID"]:
+            flow_id_counter.labels(flow_id=row["Flow_ID"]).inc(1)
+
+
+def main():
+    spark = initialize_spark()
 
     spark.sparkContext.setLogLevel("WARN")
     
@@ -42,6 +70,9 @@ def main():
     df_parsed = df.selectExpr("CAST(value AS STRING)") \
         .select(from_json(col("value"), schema).alias("data")) \
         .select("data.*")
+    
+    # Start Prometheus metrics server
+    start_prometheus_server()
 
 
     # Define device IPs (known IPs for each device)
@@ -58,19 +89,19 @@ def main():
     # Write the streams to different outputs (e.g., console or Elasticsearch) for each device
     query_device_1 = df_device_1.writeStream \
         .outputMode("append") \
-        .format("console") \
+        .foreachBatch(record_metrics) \
         .option("checkpointLocation", checkpoint_dir + "/device_1") \
         .start()
 
     query_device_2 = df_device_2.writeStream \
         .outputMode("append") \
-        .format("console") \
+        .foreachBatch(record_metrics) \
         .option("checkpointLocation", checkpoint_dir + "/device_2") \
         .start()
 
     query_device_3 = df_device_3.writeStream \
         .outputMode("append") \
-        .format("console") \
+        .foreachBatch(record_metrics) \
         .option("checkpointLocation", checkpoint_dir + "/device_3") \
         .start()
 
