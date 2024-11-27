@@ -18,38 +18,38 @@ def main():
 
 
     # Define the schema based on your dataset fields
-    # schema = StructType([
-    #     StructField("Flow_ID", StringType(), True),
-    #     StructField("Src_IP", StringType(), True),
-    #     StructField("Src_Port", IntegerType(), True),
-    #     StructField("Dst_IP", StringType(), True),
-    #     StructField("Dst_Port", IntegerType(), True),
-    #     StructField("Protocol", StringType(), True),
-    #     # Add all other fields accordingly
-    #     StructField("Label", StringType(), True),
-    #     StructField("Cat", StringType(), True),
-    #     StructField("Sub_Cat", StringType(), True),
-    #     StructField("Timestamp", StringType(), True)  # Timestamp is initially a string
-    # ])
+    schema = StructType([
+        StructField("Flow_ID", StringType(), True),
+        StructField("Src_IP", StringType(), True),
+        StructField("Src_Port", IntegerType(), True),
+        StructField("Dst_IP", StringType(), True),
+        StructField("Dst_Port", IntegerType(), True),
+        StructField("Protocol", StringType(), True),
+        # Add all other fields accordingly
+        StructField("Label", StringType(), True),
+        StructField("Cat", StringType(), True),
+        StructField("Sub_Cat", StringType(), True),
+        StructField("Timestamp", StringType(), True)  # Timestamp is initially a string
+    ])
 
     #Schema definition
-    schema_ls = []
+    # schema_ls = []
 
-    f_num = open('numeric_cols.txt', 'r')
+    # f_num = open('numeric_cols.txt', 'r')
 
-    for num_col in f_num:
-        schema_ls.append(StructField(num_col, IntegerType(), True))
+    # for num_col in f_num:
+    #     schema_ls.append(StructField(num_col, IntegerType(), True))
 
-    f_num.close()
+    # f_num.close()
 
-    f_non_num = open('non_numeric_cols.txt', 'r')
+    # f_non_num = open('non_numeric_cols.txt', 'r')
 
-    for non_num_col in f_non_num:
-        schema_ls.append(StructField(non_num_col, StringType(), True))
+    # for non_num_col in f_non_num:
+    #     schema_ls.append(StructField(non_num_col, StringType(), True))
 
-    f_non_num.close()
+    # f_non_num.close()
 
-    schema = StructType(schema_ls)
+    # schema = StructType(schema_ls)
 
     # Read data from Kafka
     df = spark.readStream \
